@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+# Copy to bin/capture-target. Builds the SwiftUI app for a simulator and
+# screenshots each state in $VERNACULAR_STATES to
+# $VERNACULAR_OUTPUT/<scenario>/<state>.png.
+#
+# The app must honor two launch arguments: -vernacularScenario <name> (load
+# that scenario's recorded fixtures instead of the network) and
+# -vernacularRoute <path> (open that screen). capture_spec.rb writes each
+# state's path to tmp/vernacular/routes/<scenario>.json.
+require 'json'
+require 'fileutils'
+
+PROJECT = ENV.fetch('VERNACULAR_XCODEPROJ', 'ios/App.xcodeproj')
+SCHEME = ENV.fetch('VERNACULAR_SCHEME', 'App')
+SIMULATOR = ENV.fetch('VERNACULAR_SIMULATOR', 'iPhone 16')
+SETTLE = Float(ENV.fetch('VERNACULAR_SETTLE_SECONDS', 4))
+DERIVED = 'tmp/vernacular/DerivedData'
+
+def run(*command) = system(*command, out: File::NULL) || abort("failed: #{command.join(' ')}")
+
+devices = JSON.parse(`xcrun simctl list devices available --json`)['devices'].select { |runtime, _| runtime.include?('iOS') }.values.flatten
+device = devices.find { it['name'] == SIMULATOR && it['state'] == 'Booted' } || devices.find { it['name'] == SIMULATOR } or abort "no #{SIMULATOR} simulator"
+unless device['state'] == 'Booted'
+  run('xcrun', 'simctl', 'boot', device['udid'])
+  run('xcrun', 'simctl', 'bootstatus', device['udid'], '-b')
+  run('xcrun', 'simctl', 'status_bar', device['udid'], 'override', '--time', '9:41', '--batteryState', 'charged', '--batteryLevel', '100')
+end
+
+system('xcodebuild', '-project', PROJECT, '-scheme', SCHEME, '-destination', "id=#{device['udid']}",
+       '-derivedDataPath', DERIVED, 'CODE_SIGNING_ALLOWED=NO', '-quiet', 'build') or exit 1
+exit 0 if ARGV.include?('--build-only')
+
+run('xcrun', 'simctl', 'install', device['udid'], Dir["#{DERIVED}/Build/Products/Debug-iphonesimulator/*.app"].first)
+ENV.fetch('VERNACULAR_STATES').split(',').each do |spec|
+  scenario, state = spec.split(':')
+  routes = "tmp/vernacular/routes/#{scenario}.json"
+  route = File.exist?(routes) ? JSON.parse(File.read(routes))[state] : nil
+  out = File.join(ENV.fetch('VERNACULAR_OUTPUT'), scenario, "#{state}.png")
+  FileUtils.mkdir_p(File.dirname(out))
+  args = [ '-vernacularScenario', scenario, *([ '-vernacularRoute', route ] if route) ]
+  run('xcrun', 'simctl', 'launch', '--terminate-running-process', device['udid'], ENV.fetch('VERNACULAR_BUNDLE_ID'), *args)
+  sleep SETTLE
+  run('xcrun', 'simctl', 'io', device['udid'], 'screenshot', out)
+end

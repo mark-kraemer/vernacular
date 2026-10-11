@@ -1,0 +1,6 @@
+# Screens in build order. Vernacular sets status, progress, done, and reason.
+- screen: sign_in
+  status: pending
+  notes: Signing in with email and password, and the forgot-password link.
+  reference:
+    - app/views/sessions/new.html.erb

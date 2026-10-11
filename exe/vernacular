@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+# Vernacular: rebuild an app in a new stack, one gated checkpoint at a time.
+#
+#   vernacular init                    scaffold vernacular/ (config, queue, memory) in this repo
+#   vernacular run [screen ...]        plan (if needed) and build every pending screen, or the named ones
+#   vernacular plan <screen>           write and validate a screen's checkpoint plan
+#   vernacular status                  whether a run is live, what it is doing, and the queue
+#   vernacular pause                   stop a live run after its current checkpoint commits
+#   vernacular capture <scenario,...>  run capture_reference for these scenarios
+#   vernacular shoot <scenario|scenario:state,...>  run capture_target for these states
+require_relative '../lib/vernacular'
+
+module Vernacular
+  command, *args = ARGV
+  case command
+  when 'init'
+    FileUtils.mkdir_p(HOME)
+    %w[config.yml queue.yml memory.md].each do |name|
+      next puts("exists   vernacular/#{name}") if HOME.join(name).exist?
+
+      FileUtils.cp(GEM.join('templates', name), HOME.join(name))
+      puts "created  vernacular/#{name}"
+    end
+    ignore = ROOT.join('.gitignore')
+    unless ignore.exist? && ignore.read.match?(%r{^/?tmp/(vernacular/?)?$})
+      File.open(ignore, 'a') { it.puts('tmp/vernacular/') }
+      puts 'appended tmp/vernacular/ to .gitignore'
+    end
+    puts 'Next: fill in vernacular/config.yml and vernacular/queue.yml, commit, then `vernacular run`.'
+  when 'run' then Driver.new.run(args)
+  when 'plan' then Driver.new.plan(args.fetch(0) { abort 'usage: vernacular plan <screen>' })
+  when 'status' then Driver.new.status_report
+  when 'pause' then Driver.new.pause
+  when 'capture'
+    abort 'vernacular: commands.capture_reference is not configured' unless config.command('capture_reference')
+    result = Capture.reference(args.join(',').split(','))
+    puts result.success? ? "captured → #{TMP.join('reference')}" : result.tail(80)
+    exit result.success? ? 0 : 1
+  when 'shoot'
+    abort 'vernacular: commands.capture_target is not configured' unless config.command('capture_target')
+    states = Capture.expand(args.join(',').split(','))
+    abort 'vernacular: no states; run `vernacular capture <scenario>` first or pass scenario:state' if states.empty?
+    result, pairs = Capture.target(states)
+    abort Gates.errors(result) unless result.success?
+    pairs.each { puts "#{it.scenario}:#{it.state}: target #{it.target || 'MISSING'} · reference #{it.reference}" }
+  else
+    puts File.read(__FILE__).lines.grep(/^#( |$)/).drop(1).map { it.sub(/^# ?/, '') }.join
+  end
+end

@@ -1,0 +1,42 @@
+reference: the Rails app as its Hotwire Native iOS shell renders it
+target: a SwiftUI app in ios/
+read_first: [CLAUDE.md, docs/native-architecture.md, DESIGN.md]
+hard_limits: |
+  - Never change web views or HTML controller behavior.
+  - Never hand-edit files in ios/Kit/Sources/Kit/Resources/Fixtures; regenerate them with `vernacular capture`.
+planning: |
+  Scenarios use the DSL in spec/vernacular/scenario.rb and FactoryBot factories in spec/factories.
+  Each state's `api:` lists the requests the native screen makes, as "GET /api/v1/..." strings with real ids from `seeded`.
+  Test names are Swift Testing function names (lowerCamelCase).
+scenarios: spec/vernacular/scenarios/{screen}.rb
+commands:
+  lint:
+    - { files: "*.rb", run: bin/rubocop }
+  build:
+    - swift build --package-path ios/Kit
+    - bin/capture-target --build-only
+  test:
+    - swift test --package-path ios/Kit
+    - bundle exec rspec spec/requests/api
+  test_passed: 'Test {name}\(.*?\) passed'
+  regression:
+    - swift test --package-path ios/Kit
+    - bundle exec rspec spec/requests spec/models
+  capture_reference: bundle exec rspec spec/vernacular/capture_spec.rb
+  capture_target: bin/capture-target
+visible: [ios, app]
+tools:
+  - Bash(bundle exec rspec:*)
+  - Bash(bin/rubocop:*)
+  - Bash(swift build:*)
+  - Bash(swift test:*)
+  - Bash(xcodebuild:*)
+reviewers:
+  architecture:
+    docs: [docs/native-architecture.md, CLAUDE.md]
+    focus: correctness, authorization holes in /api/v1, N+1 queries, state that can desync, tests that don't test their name
+  guidelines:
+    docs: [DESIGN.md]
+    focus: theme tokens only, native controls (NavigationStack, sheets, Menu, confirmationDialog), SF Symbols, Dynamic Type, VoiceOver labels, 44pt targets, copy matching the web
+ui_expected: |
+  - The reference is WebKit at 393×852 @3x with the native user agent; the native shell draws the status bar, navigation bar, and tab bar around it, so only the native screenshot has them.

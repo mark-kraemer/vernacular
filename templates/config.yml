@@ -1,0 +1,51 @@
+# What is being rebuilt, and as what. Both go into every prompt.
+reference: the web app in app/, as a phone browser renders it
+target: a native app in native/
+
+# Docs the planner and implementer read before writing anything.
+read_first: [README.md]
+
+# Shown to the implementer and every reviewer.
+hard_limits: |
+  - Never change the reference app's behavior.
+
+# Stack-specific notes for the planner: how scenarios are written, which
+# helpers exist, what is out of scope.
+planning: |
+
+# Where the planner writes a screen's scenarios ({screen} is replaced).
+# scenarios: spec/vernacular/scenarios/{screen}.rb
+
+models: { build: opus, review: opus }
+max_rounds: 8
+
+commands:
+  # Run on changed files matching the glob (* crosses directories).
+  lint: []
+  #  - { files: "*.rb", run: bundle exec rubocop }
+  build: []
+  test: []
+  # A planned test only counts when the output matches this ({name} is replaced).
+  # test_passed: 'Test {name}\(.*?\) passed'
+  regression: []
+  # Write PNGs to $VERNACULAR_OUTPUT/<scenario>/<state>.png.
+  # capture_reference: ...   # receives VERNACULAR_SCENARIOS=a,b
+  # capture_target: ...      # receives VERNACULAR_STATES=a:x,b:y
+
+# A change under these paths after the UI gate passed sends the screen back to it.
+visible: [native]
+
+# Extra tools the implementer may use, in Claude Code permission syntax.
+tools: []
+#  - Bash(bundle exec rspec:*)
+
+reviewers:
+  architecture:
+    docs: []
+    focus: bugs, unhandled errors, security holes, state that can desync, tests that don't test what they're named for
+  guidelines:
+    docs: []
+    focus: the design system, platform conventions, accessibility, copy that matches the reference
+
+# Extra "expected, not a difference" notes for the UI reviewer.
+ui_expected: |

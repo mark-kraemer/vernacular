@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# Stands in for `claude -p` in the end-to-end spec. Builders append a line to
+# feature.txt, the planner writes $FAKE_PLAN, and reviewers pass.
+require 'json'
+require 'fileutils'
+
+prompt = $stdin.read
+File.open(ENV.fetch('FAKE_CLAUDE_LOG'), 'a') { it.puts(prompt, '---') }
+index = ARGV.index('--json-schema')
+schema = index ? JSON.parse(ARGV[index + 1]) : nil
+properties = schema&.fetch('properties') || {}
+
+structured =
+  if properties.key?('comparisons')
+    { comparisons: prompt.scan(/^- (\w+:\w+)$/).flatten.map { { state: it, verdict: 'PASS', differences: [] } } }
+  elsif properties.key?('memory')
+    { memory: "# Vernacular memory\n\n## Testing\n\n- Write the planned test before the code — because the gate looks for it by name.\n" }
+  elsif properties.key?('checks')
+    { checks: [], proposals: [ { title: 'Faster tests', problem: 'Round one failed.', mechanism: 'A helper.' } ] }
+  elsif properties.key?('verdict')
+    { verdict: 'APPROVE', findings: [] }
+  end
+
+if !schema && (screen = prompt[/^Screen: \*\*(\w+)\*\*/, 1]) && prompt.include?('planning agent')
+  FileUtils.mkdir_p("vernacular/screens/#{screen}")
+  File.write("vernacular/screens/#{screen}/plan.yml", ENV.fetch('FAKE_PLAN'))
+elsif !schema
+  File.open('feature.txt', 'a') { it.puts('round') }
+  File.open('CONTRACT.md', 'a') { it.puts('- a new rule') } if ENV['FAKE_TOUCH_CONTRACT']
+end
+
+puts JSON.generate(result: 'done', is_error: false, session_id: 'fake', total_cost_usd: 0.01, structured_output: structured)
