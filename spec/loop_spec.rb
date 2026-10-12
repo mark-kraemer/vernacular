@@ -112,6 +112,24 @@ RSpec.describe 'the vernacular loop' do
     expect(log.read).to include('Screen: **signup**', 'What it covers: Creating an account.')
   end
 
+  context 'when the regression gate already fails before any change' do
+    before do
+      config = YAML.safe_load(repo.join('vernacular/config.yml').read)
+      config['commands']['regression'] = [ 'echo "Missing encryption credential"; false' ]
+      write('vernacular/config.yml', YAML.dump(config))
+      git('commit', '-qam', 'broken environment')
+    end
+
+    it 'stops before implementing, so no rounds are spent on a failure no checkpoint can fix' do
+      output = vernacular('run')
+
+      expect(output).to include('regression gate fails on HEAD before any change', 'Missing encryption credential')
+      expect(log).not_to exist
+      expect(YAML.safe_load(repo.join('vernacular/queue.yml').read).first['status']).to eq('pending')
+      expect(git('status', '--porcelain')).to be_empty
+    end
+  end
+
   it 'refuses to start on a dirty tree' do
     write('stray.txt', 'x')
 

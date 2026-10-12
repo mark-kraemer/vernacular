@@ -7,7 +7,10 @@ module Vernacular
       claim_run!
       queue = Queue.load
       @interrupted = queue.screens.find { it['status'] == 'running' }&.fetch('screen')
-      require_clean_tree! unless @interrupted
+      unless @interrupted
+        require_clean_tree!
+        require_green_baseline!
+      end
       targets = names.empty? ? queue.pending.map { it['screen'] } : names
       targets = [ @interrupted, *targets ].uniq if @interrupted && (names.empty? || names.include?(@interrupted))
       abort "vernacular: #{@interrupted} was interrupted mid-checkpoint; run it first (vernacular run #{@interrupted})" if @interrupted && targets.first != @interrupted
@@ -190,6 +193,18 @@ module Vernacular
     def require_clean_tree!
       dirty = Gates.changed_files
       abort "vernacular: commit or stash these first — vernacular commits the whole tree:\n#{dirty.join("\n")}" if dirty.any?
+    end
+
+    # A regression failure on a clean HEAD (a missing credentials key, a stale
+    # test database) is not the implementer's to fix, yet the final gate
+    # would feed it back every round until the checkpoint blocked.
+    def require_green_baseline!
+      Vernacular.log('checking the regression gate on HEAD')
+      baseline = Gates.final
+      return if baseline.passed
+
+      abort "vernacular: the regression gate fails on HEAD before any change, so no checkpoint could pass it. " \
+            "Fix the environment first.\n#{baseline.feedback}"
     end
   end
 end
