@@ -6,6 +6,12 @@ Your Rails views are the spec. Each screen state is rendered twice: once by WebK
 
 It's an open-source take on Shopify's [Helix](https://shopify.engineering/helix), which proved the core idea: **an attempt may be wrong; it may not ship until it isn't.** Vernacular removes the engineer approval gate. Machines enforce every gate, and a checkpoint that can't pass them gets set aside rather than waved through.
 
+## Why I built it
+
+I am exploring better ways to build software with agents: which decisions still need a person, and which ones a machine can enforce so nobody has to watch. Vernacular tests the far end of that question. It takes the human out of the loop and asks whether hard gates (exit codes, schema-constrained reviews, side-by-side screenshots) are enough to keep an unattended agent honest. When they are not, the loop says so. A checkpoint that cannot pass is set aside with its evidence, and any finding a regex can catch becomes a check that every later checkpoint must pass.
+
+Its counterpart, Clearance, sits at the other end: agents run between a few human decision points, and the work is answering those quickly.
+
 ## Example
 
 [Prep Slate](https://prepslate.com)'s Hotwire Native iOS app (left) and the fully native SwiftUI app built from it (right) by the loop Vernacular was extracted from. Both show the same library on iOS 26.
